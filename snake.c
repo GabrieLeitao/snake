@@ -93,24 +93,38 @@ int myRand(int max_value)
 /*-------------------------------------------------*/
 void initWorld(WORLD x)
 {
-    int i, j, value, length;
+    int i, j, k, randVal, totalWeight = 0;
 
-    char simb[] = {' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',BONUS_CHAR,BONUS_CHAR,BONUS_CHAR,MINUS_CHAR,'!','?'};
-    length = strlen(simb);
+    // Define the probability distribution of characters
+    CharProbability simb[] = {
+        {' ', 120},  // 60% empty space
+        {BONUS_CHAR, 12},  // 20% bonus
+        {MINUS_CHAR, 2},  // 10% minus
+        {LOOP_CHAR, 1},  // 10% loop
+    };
 
-    for(i = 0; i < MAXL; ++i)
-        for (j = 0; j < MAXC; ++j)
-        {
-            value = myRand(length - 2);
-            if (value  < 0)
-                value = 0;
-            if (value > length - 1)
-                value = length - 1;
+    int numChars = sizeof(simb) / sizeof(simb[0]);
 
-            x[i][j] = simb[value];
+    // Calculate total weight
+    for (k = 0; k < numChars; ++k)
+        totalWeight += simb[k].weight;
+
+    for (i = 0; i < MAXL; ++i) {
+        for (j = 0; j < MAXC; ++j) {
+            randVal = rand() % totalWeight;
+
+            int cumulativeWeight = 0;
+            for (k = 0; k < numChars; ++k) {
+                cumulativeWeight += simb[k].weight;
+                if (randVal < cumulativeWeight) {
+                    x[i][j] = simb[k].character;
+                    break;
+                }
+            }
         }
+    }
 
-    x[SNAKESTART_LINE][SNAKESTART_COL] = simb[0];
+    x[SNAKESTART_LINE][SNAKESTART_COL] = ' '; // Ensure the start position is empty
 }
 
 /*-------------------------------------------------*/
@@ -147,19 +161,22 @@ int gameOn(WORLD x)
 
     for(i = 0; i < MAXL; ++i)
         for (j = 0; j < MAXC; ++j)
-            if (x[i][j] != BONUS_CHAR && x[i][j] != MINUS_CHAR)
+            if (x[i][j] != BONUS_CHAR && x[i][j] != MINUS_CHAR && x[i][j] != LOOP_CHAR)
                 count = count + 1;
 
     return (MAXL*MAXC - count);
 }
 /*-------------------------------------------------*/
-int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION newp)
+int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION direction)
 {
     int i;
 
     /* Test position*/
     /* Snake eats goodies at the position if any */
     /* and increases its size just be one */
+    POSITION newp;
+    newp.c = snake->pos[0].c + direction.c;
+    newp.l = snake->pos[0].l + direction.l;
 
     if (world[newp.l][newp.c] == SNAKE_CHAR)
     {
@@ -209,11 +226,39 @@ int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION newp)
         if (snake->dim > 1)
             snake->dim -= 1;
     }
+    else if (world[newp.l][newp.c] == LOOP_CHAR)
+    {
+        world[newp.l][newp.c] = ' ';
+
+        POSITION loop_pos = get_new_loop_position(world);
+        
+        if (snake->dim > 1)
+        {
+            newp = loop_pos;
+        }
+        else
+        {
+            printf("You need to have at least 2 points to use the loop\n");
+        }
+    }
     /* Update positions */
     for (i = snake->dim - 1; i > 0; i--)
         snake->pos[i] =  snake->pos[i - 1];
     snake->pos[0] = newp;
 
     return 0;
+}
+
+/*-------------------------------------------------*/
+
+POSITION get_new_loop_position(WORLD x)
+{
+    int i, j;
+    POSITION loop_pos;
+    for(i = 0; i < MAXL; ++i)
+        for (j = 0; j < MAXC; ++j)
+            if (x[i][j] == LOOP_CHAR)
+                loop_pos = set_position(i, j);
+    return loop_pos;
 }
 /* End of snake_dinamica.c */

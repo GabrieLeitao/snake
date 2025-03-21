@@ -21,6 +21,7 @@ typedef struct position
 #define SNAKE_CHAR '*'
 #define BONUS_CHAR '$'
 #define MINUS_CHAR '-'
+#define LOOP_CHAR '&'
 
 // World size
 #define MAXL 40
@@ -38,6 +39,11 @@ typedef struct snake
     int size_vector;
     POSITION *pos;   /* De suporte ao vector dinâmico */
 } SNAKE;
+
+typedef struct {
+    char character;
+    int weight; // Higher values mean higher probability
+} CharProbability;
 
 typedef char WORLD[MAXL][MAXC];
 
@@ -57,6 +63,8 @@ void showWorldSnake(WORLD x, SNAKE snake);
 
 int gameOn(WORLD x);
 
-int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION newp );
+int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION direction);
+
+POSITION get_new_loop_position(WORLD x);
 
 #endif /* SNAKE_H_ */

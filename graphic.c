@@ -36,7 +36,7 @@ int main() {
         position.c += direction.c;
         position.l += direction.l;
         // Draw the game
-        quit = WorldSnakeInteraction(world, &snake, position);
+        quit = WorldSnakeInteraction(world, &snake, direction);
         drawGame(world, &snake);
 
         if (!gameOn(world))
@@ -124,17 +124,22 @@ void drawGame(WORLD world, SNAKE *snake) {
         {
             if (world[i][j] == BONUS_CHAR)
             {
-                SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the Increase
+                SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the Increase - BONUS_CHAR
                 SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
                 SDL_RenderFillRect(renderer, &cellRect);
             }
             else if (world[i][j] == MINUS_CHAR)
             {
-                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for the decrease
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for the decrease - MINUS_CHAR
                 SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
                 SDL_RenderFillRect(renderer, &cellRect);
             }
-            
+            else if (world[i][j] == LOOP_CHAR)
+            {
+                SDL_SetRenderDrawColor(renderer, 120, 80, 30, 255); // Color for the LOOPHOLE
+                SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+                SDL_RenderFillRect(renderer, &cellRect);
+            }
         }
 
     // Draw borders
