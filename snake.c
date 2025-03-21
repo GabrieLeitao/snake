@@ -262,3 +262,26 @@ POSITION get_new_loop_position(WORLD x)
     return loop_pos;
 }
 /* End of snake_dinamica.c */
+
+/*
+void initWorld(WORLD x)
+{
+    int i, j, value, length;
+
+    char simb[] = {' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',BONUS_CHAR,BONUS_CHAR,BONUS_CHAR,MINUS_CHAR,LOOP_CHAR,'!','?'};
+    length = strlen(simb);
+
+    for(i = 0; i < MAXL; ++i)
+        for (j = 0; j < MAXC; ++j)
+        {
+            value = myRand(length - 2);
+            if (value  < 0)
+                value = 0;
+            if (value > length - 1)
+                value = length - 1;
+
+            x[i][j] = simb[value];
+        }
+
+    x[SNAKESTART_LINE][SNAKESTART_COL] = simb[0];
+}*/
