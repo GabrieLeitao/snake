@@ -1,27 +1,32 @@
 # Compiler
 CC = gcc
 # Compile flags
-CFLAGS = -Wall -pedantic -std=c99 -O3
+CFLAGS = -Wall -pedantic -std=c99 -g
+LDFLAGS = -lSDL2 -lm  # Libraries
 
+# Manually specify source files
+SRC_TERMINAL = main.c snake.c
+SRC_GRAPHIC = graphic.c snake.c utils.c
+
+# Generate object file list
+OBJ_TERMINAL = $(SRC_TERMINAL:.c=.o)
+OBJ_GRAPHIC = $(SRC_GRAPHIC:.c=.o)
+
+# Default target (builds the terminal version)
 default: snake
 
-# Terminal version: "make snake" ou apenas: "make"
-snake: main.o snake.o
-	$(CC) $(CFLAGS) -o snake main.o snake.o
+# Terminal version
+snake: $(OBJ_TERMINAL)
+	$(CC) $(CFLAGS) -o $@ $^
 
-# Graphic version: "make graphic"
-graphic: graphic.o snake.o
-	$(CC) $(CFLAGS) -o graphic graphic.o snake.o -lSDL2
+# Graphic version
+graphic: $(OBJ_GRAPHIC)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Object files
-graphic.o: graphic.c
-	$(CC) $(CFLAGS) -c graphic.c
+# Compile each .c file into a .o file
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-main.o: main.c
-	$(CC) $(CFLAGS) -c main.c
-
-snake.o: snake.c
-	$(CC) $(CFLAGS) -c snake.c
-
+# Clean build files
 clean:
 	rm -f *.o snake graphic

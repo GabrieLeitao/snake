@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>  /* rand() */
+#include <time.h>  /* rand() */
 #include <string.h>
 #include <SDL2/SDL.h>
 
@@ -24,8 +25,8 @@ typedef struct position
 #define LOOP_CHAR '&'
 
 // World size
-#define MAXL 40
-#define MAXC 40
+#define MAXL 50
+#define MAXC 50
 
 // Define constants for window dimensions and cell size, for graphic mode with lSDL2
 #define CELL_SIZE 20

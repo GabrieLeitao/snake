@@ -1,29 +1,37 @@
 #include "snake.h"
+#include "utils.h"
 
-SDL_Window *window = NULL;
-SDL_Renderer *renderer = NULL;
 
 // Rendering functions using SDL
 void initializeSDL();
 void drawGame(WORLD world, SNAKE *snake);
+void drawRoundedRect(SDL_Renderer *renderer, SDL_Rect rect, int radius, SDL_Color color);
 POSITION get_direction(POSITION direction);
 void cleanupSDL();
 
+
+SDL_Window *window = NULL;
+SDL_Renderer *renderer = NULL;
+
+Uint32 elapsedTime = 0;
+
 int main() {
+    srand(time(NULL));
+
     // Initialize SDL and game objects
     initializeSDL();
     WORLD world;
     SNAKE snake;
-    POSITION position;
     POSITION direction;
     int quit = 0;
     float delay = DELAY_TIME;
+    float lambda = 0.005; // Decay rate
+    int iteration = 0;
 
     initWorld(world);
     initSnake(&snake);
 
     direction = set_position(0, 1); // line, column
-    position = snake.pos[0];
 
     Uint32 startTime, endTime, deltaTime;
     // Main game loop
@@ -32,11 +40,9 @@ int main() {
 
         // Atualizar direcao
         direction = get_direction(direction);
-        // Mover snake
-        position.c += direction.c;
-        position.l += direction.l;
-        // Draw the game
+        
         quit = WorldSnakeInteraction(world, &snake, direction);
+        // Draw the game
         drawGame(world, &snake);
 
         if (!gameOn(world))
@@ -44,7 +50,7 @@ int main() {
             printf("\n !! You won, Congrats!! \n");
             break;
         }
-
+        
         // Calculate time taken for frame
         endTime = SDL_GetTicks(); // Get end time of frame
         deltaTime = endTime - startTime; // Calculate time taken for frame
@@ -53,12 +59,10 @@ int main() {
         if (deltaTime < delay) {
             SDL_Delay(delay - deltaTime);
         }
-        if (delay < DELAY_TIME / 6)
-            delay -= delay / DELAY_TIME / 2;
-        else
-            delay -= DELAY_TIME / delay;
-        if (delay <= 0)
-            delay = 2;
+
+        // Gradually decrease delay to increase speed
+        iteration++;
+        delay = DELAY_TIME * exp(-lambda * iteration) + 10;
             
     } while (quit != 1);
 
@@ -97,54 +101,50 @@ void initializeSDL() {
 }
 
 // Function to draw the game objects (snake, world, etc.)
-void drawGame(WORLD world, SNAKE *snake) {
+void drawGame(WORLD world, SNAKE *snake)
+{
     int i, j;
     
-    // Clear the screen
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // RGB, alpha (transparency)
+    // Background color (soft dark blue)
+    SDL_SetRenderDrawColor(renderer, 44, 62, 80, 255);
     SDL_RenderClear(renderer);
 
-    for(i = 0; i < MAXL; ++i)
-        for (j = 0; j < MAXC; ++j)
-            if (world[i][j] == SNAKE_CHAR)
-                world[i][j] = ' ';
+    elapsedTime = SDL_GetTicks();
 
-    for (i = 0; i < snake->dim; ++i)
-        world[snake->pos[i].l][snake->pos[i].c] = SNAKE_CHAR;
-
-    // Draw the snake
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green color for the snake
+    // Draw the snake with a green gradient
     for (i = 0; i < snake->dim; i++) {
         SDL_Rect cellRect = {(snake->pos[i].c + 1) * CELL_SIZE, (snake->pos[i].l + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
-        SDL_RenderFillRect(renderer, &cellRect);
+        int r = 110 - (i * 5);
+        int g = 190 - (i * 5);
+        r = clamp(r, 0, 255);
+        g = clamp(g, 0, 255);
+        SDL_Color snakeColor = {r, g, 69, 255}; // Soft green gradient
+        drawRoundedRect(renderer, cellRect, CELL_SIZE / 4, snakeColor);
     }
-    // Draw objects
-    for(i = 0; i < MAXL; ++i)
-        for (j = 0; j < MAXC; ++j)
-        {
-            if (world[i][j] == BONUS_CHAR)
-            {
-                SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue color for the Increase - BONUS_CHAR
-                SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
-                SDL_RenderFillRect(renderer, &cellRect);
+
+    // Draw objects with softer colors
+    for (i = 0; i < MAXL; ++i) {
+        for (j = 0; j < MAXC; ++j) {
+            SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+            SDL_Color objColor = {0, 0, 0, 0};
+
+            if (world[i][j] == BONUS_CHAR) {
+                objColor = (SDL_Color){74, 144, 226, 255}; // Soft blue
+            } else if (world[i][j] == MINUS_CHAR) {
+                objColor = (SDL_Color){233, 78, 78, 255}; // Soft red
+            } else if (world[i][j] == LOOP_CHAR) {
+                objColor = (SDL_Color){168, 30, 170, 255}; // Soft brown
             }
-            else if (world[i][j] == MINUS_CHAR)
-            {
-                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for the decrease - MINUS_CHAR
-                SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
-                SDL_RenderFillRect(renderer, &cellRect);
-            }
-            else if (world[i][j] == LOOP_CHAR)
-            {
-                SDL_SetRenderDrawColor(renderer, 120, 80, 30, 255); // Color for the LOOPHOLE
-                SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
-                SDL_RenderFillRect(renderer, &cellRect);
+
+            if (objColor.r != 0) { // Skip empty spaces
+                drawRoundedRect(renderer, cellRect, CELL_SIZE / 6, objColor);
             }
         }
+    }
 
     // Draw borders
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 175);
-    for(i = 0; i <= MAXL + 1; ++i)
+    for (i = 0; i <= MAXL + 1; ++i)
     {
         SDL_Rect cellRect = {(MAXC + 1) * CELL_SIZE, i * CELL_SIZE, CELL_SIZE / 2, CELL_SIZE};
         SDL_RenderFillRect(renderer, &cellRect);
@@ -161,6 +161,38 @@ void drawGame(WORLD world, SNAKE *snake) {
         
     // Update the screen
     SDL_RenderPresent(renderer);
+}
+
+void drawRoundedRect(SDL_Renderer *renderer, SDL_Rect rect, int radius, SDL_Color color)
+{
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+
+    // Fill center rectangle
+    SDL_Rect centerRect = {rect.x + radius, rect.y + radius, rect.w - 2 * radius, rect.h - 2 * radius};
+    SDL_RenderFillRect(renderer, &centerRect);
+
+    // Fill side rectangles (excluding rounded areas)
+    SDL_Rect leftRect = {rect.x, rect.y + radius, radius, rect.h - 2 * radius};
+    SDL_RenderFillRect(renderer, &leftRect);
+    SDL_Rect rightRect = {rect.x + rect.w - radius, rect.y + radius, radius, rect.h - 2 * radius};
+    SDL_RenderFillRect(renderer, &rightRect);
+
+    SDL_Rect topRect = {rect.x + radius, rect.y, rect.w - 2 * radius, radius};
+    SDL_RenderFillRect(renderer, &topRect);
+    SDL_Rect bottomRect = {rect.x + radius, rect.y + rect.h - radius, rect.w - 2 * radius, radius};
+    SDL_RenderFillRect(renderer, &bottomRect);
+
+    // Draw rounded corners using pixel-by-pixel rendering
+    for (int w = 0; w < radius; w++) {
+        for (int h = 0; h < radius; h++) {
+            if ((w * w + h * h) <= (radius * radius)) { // Circle equation
+                SDL_RenderDrawPoint(renderer, rect.x + radius - w, rect.y + radius - h); // Top-left
+                SDL_RenderDrawPoint(renderer, rect.x + rect.w - radius + w - 1, rect.y + radius - h); // Top-right
+                SDL_RenderDrawPoint(renderer, rect.x + radius - w, rect.y + rect.h - radius + h - 1); // Bottom-left
+                SDL_RenderDrawPoint(renderer, rect.x + rect.w - radius + w - 1, rect.y + rect.h - radius + h - 1); // Bottom-right
+            }
+        }
+    }
 }
 
 // Function to handle user input

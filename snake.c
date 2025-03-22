@@ -15,7 +15,7 @@ POSITION readKeyboard(POSITION head)
 {
     char linha[100];
     fflush(stdout);
-    fgets(linha, 100, stdin);
+    (void) fgets(linha, 100, stdin);
     switch(linha[0])
     {
         case 'w':
@@ -45,15 +45,15 @@ void initSnake(SNAKE *snake)
     (*snake).pos = (POSITION *)calloc(MAXSNAKE, sizeof(POSITION));
     if (snake->pos == NULL)
     {
-        printf("Erro -> calloc - falta de memória ->>>> exit(0)\n");
-        exit(0);
+        fprintf(stderr, "Memory reallocation failed\n");
+        exit(1);
     }
-
-    snake->size_vector =  MAXSNAKE;
+    snake->size_vector = MAXSNAKE;
 
     for (i = 1; i < MAXSNAKE; ++i)
+    {
         snake->pos[i] = set_position(-1,-1);
-    
+    }
     snake->pos[0] = set_position(SNAKESTART_LINE,SNAKESTART_COL);
     snake->dim = 1;
 }
@@ -111,7 +111,7 @@ void initWorld(WORLD x)
 
     for (i = 0; i < MAXL; ++i) {
         for (j = 0; j < MAXC; ++j) {
-            randVal = rand() % totalWeight;
+            randVal = myRand(totalWeight);
 
             int cumulativeWeight = 0;
             for (k = 0; k < numChars; ++k) {
@@ -161,90 +161,76 @@ int gameOn(WORLD x)
 
     for(i = 0; i < MAXL; ++i)
         for (j = 0; j < MAXC; ++j)
-            if (x[i][j] != BONUS_CHAR && x[i][j] != MINUS_CHAR && x[i][j] != LOOP_CHAR)
-                count = count + 1;
+            if (x[i][j] == BONUS_CHAR || x[i][j] == MINUS_CHAR || x[i][j] == LOOP_CHAR)
+                count++;
 
-    return (MAXL*MAXC - count);
+    return count > 0;
 }
+
 /*-------------------------------------------------*/
 int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION direction)
 {
     int i;
 
-    /* Test position*/
-    /* Snake eats goodies at the position if any */
-    /* and increases its size just be one */
     POSITION newp;
     newp.c = snake->pos[0].c + direction.c;
     newp.l = snake->pos[0].l + direction.l;
 
-    if (world[newp.l][newp.c] == SNAKE_CHAR)
-    {
+    if (world[newp.l][newp.c] == SNAKE_CHAR) {
         printf("You shouldn't eat yourself!\n");
         return 1;
     }
-    else if (newp.l < 0 || newp.l >= MAXL || newp.c < 0 || newp.c >= MAXC)
-    {
+    if (newp.l < 0 || newp.l >= MAXL || newp.c < 0 || newp.c >= MAXC) {
         printf("Watch your head, buddy!\n");
         return 1;
     }
-    
 
-    if (world[newp.l][newp.c] == BONUS_CHAR)
-    {
-        world[newp.l][newp.c] = ' ';
+    // Clear the tail
+    world[snake->pos[snake->dim - 1].l][snake->pos[snake->dim - 1].c] = ' ';
 
-        /* Increase the vector size */
-        if (snake->dim == snake->size_vector)
-        {
-            POSITION *ap;
-            ap = (POSITION *) realloc(snake->pos, (sizeof(POSITION))*(snake->size_vector + INCSNAKE));
-            if (ap != NULL)
-            {
-                snake->pos = ap;  /* update the pointer with the new address */
-                snake->size_vector = snake->size_vector + INCSNAKE;
+    // Handle bonuses or minus (growth or shrinkage)
+    if (world[newp.l][newp.c] == BONUS_CHAR) {
+        world[newp.l][newp.c] = ' ';  // Clear the bonus
+        // Increase snake size
+        if (snake->dim == snake->size_vector) {
+            POSITION *ap = (POSITION *)realloc(snake->pos, (sizeof(POSITION)) * (snake->size_vector + INCSNAKE));
+            if (ap != NULL) {
+                snake->pos = ap; 
+                snake->size_vector += INCSNAKE;
+            } else {
+                fprintf(stderr, "Memory reallocation failed\n");
+                exit(1);
             }
         }
-        if (snake->dim < snake->size_vector )
-            snake->dim += 1;
+        snake->dim += 1;
     }
-    else if (world[newp.l][newp.c] == MINUS_CHAR)
-    {
-        world[newp.l][newp.c] = ' ';
-
-        /* Decrease the vector size */
-        if (snake->size_vector - snake-> dim >= 5)
-        {
-            POSITION *ap;
-            ap = (POSITION *) realloc(snake->pos, (sizeof(POSITION))*(snake->size_vector - INCSNAKE));
-            if (ap != NULL)
-            {
-                snake->pos = ap;  /* update the pointer with the new address */
-                snake->size_vector = snake->size_vector - INCSNAKE;
-            }
-        }
-        if (snake->dim > 1)
+    else if (world[newp.l][newp.c] == MINUS_CHAR) {
+        world[newp.l][newp.c] = ' ';  // Clear the minus
+        // Decrease snake size
+        if (snake->dim > 1) {
             snake->dim -= 1;
-    }
-    else if (world[newp.l][newp.c] == LOOP_CHAR)
-    {
-        world[newp.l][newp.c] = ' ';
-
-        POSITION loop_pos = get_new_loop_position(world);
-        
-        if (snake->dim > 1)
-        {
-            newp = loop_pos;
+            world[snake->pos[snake->dim - 1].l][snake->pos[snake->dim - 1].c] = ' ';
+        } else {
+            printf("You shrinked!\n");
+            return 1;
         }
-        else
-        {
+    } else if (world[newp.l][newp.c] == LOOP_CHAR) {
+        world[newp.l][newp.c] = ' ';  // Clear the loop
+        POSITION loop_pos = get_new_loop_position(world);
+        if (snake->dim > 1) {
+            newp = loop_pos;  // Set the new position if using the loop
+        } else {
             printf("You need to have at least 2 points to use the loop\n");
         }
     }
-    /* Update positions */
+
+    // Move the body
     for (i = snake->dim - 1; i > 0; i--)
-        snake->pos[i] =  snake->pos[i - 1];
+    {
+        snake->pos[i] = snake->pos[i - 1];
+    }
     snake->pos[0] = newp;
+    world[snake->pos[0].l][snake->pos[0].c] = SNAKE_CHAR;  // Update the world with the new head
 
     return 0;
 }
@@ -262,26 +248,3 @@ POSITION get_new_loop_position(WORLD x)
     return loop_pos;
 }
 /* End of snake_dinamica.c */
-
-/*
-void initWorld(WORLD x)
-{
-    int i, j, value, length;
-
-    char simb[] = {' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',BONUS_CHAR,BONUS_CHAR,BONUS_CHAR,MINUS_CHAR,LOOP_CHAR,'!','?'};
-    length = strlen(simb);
-
-    for(i = 0; i < MAXL; ++i)
-        for (j = 0; j < MAXC; ++j)
-        {
-            value = myRand(length - 2);
-            if (value  < 0)
-                value = 0;
-            if (value > length - 1)
-                value = length - 1;
-
-            x[i][j] = simb[value];
-        }
-
-    x[SNAKESTART_LINE][SNAKESTART_COL] = simb[0];
-}*/
