@@ -6,6 +6,9 @@
 void initializeSDL();
 void drawGame(WORLD world, SNAKE *snake);
 void drawRoundedRect(SDL_Renderer *renderer, SDL_Rect rect, int radius, SDL_Color color);
+void drawObject(SDL_Renderer *renderer, SDL_Rect cellRect, SDL_Color Color, int objSize);
+SDL_Color get_pulse_color(SDL_Color baseColor, float glowSpeed, Uint32 creationTime, float delta);
+SDL_Color get_glow_color(SDL_Color baseColor, float glowSpeed, Uint32 creationTime, float delta);
 POSITION get_direction(POSITION direction);
 void cleanupSDL();
 
@@ -34,6 +37,11 @@ int main() {
     direction = set_position(0, 1); // line, column
 
     Uint32 startTime, endTime, deltaTime;
+    Uint32 lastLogicUpdateTime = SDL_GetTicks();
+    Uint32 lastRenderTime = SDL_GetTicks();
+    const Uint32 renderInterval = 1000 / RENDER_FPS;
+    Uint32 objectAddInterval = 2000; // 2 seconds
+    Uint32 lastObjectAddTime = SDL_GetTicks();
     // Main game loop
     do {
         startTime = SDL_GetTicks();
@@ -41,9 +49,34 @@ int main() {
         // Atualizar direcao
         direction = get_direction(direction);
         
-        quit = WorldSnakeInteraction(world, &snake, direction);
-        // Draw the game
-        drawGame(world, &snake);
+        // Update game logic based on snake speed
+        Uint32 currentTime = SDL_GetTicks();
+        if (currentTime - lastLogicUpdateTime >= delay) {
+            quit = WorldSnakeInteraction(world, &snake, direction);
+            lastLogicUpdateTime = currentTime;
+
+            // Gradually decrease delay to increase speed
+            iteration++;
+            delay = DELAY_TIME * exp(-lambda * iteration) + 20;
+        }
+
+        // Add new objects at a gradually increasing rate
+        if (currentTime - lastObjectAddTime >= objectAddInterval) {
+            addNewObject(world);
+            lastObjectAddTime = currentTime;
+
+            // Gradually decrease the interval to add new objects
+            objectAddInterval = objectAddInterval * 0.9; // Decrease interval by 5%
+            if (objectAddInterval < 500) { // Set a minimum interval of 1 second
+                objectAddInterval = 500;
+            }
+        }
+
+        // Render the game at a fixed interval (60 FPS)
+        if (currentTime - lastRenderTime >= renderInterval) {
+            drawGame(world, &snake);
+            lastRenderTime = currentTime;
+        }
 
         if (!gameOn(world))
         {
@@ -52,17 +85,13 @@ int main() {
         }
         
         // Calculate time taken for frame
-        endTime = SDL_GetTicks(); // Get end time of frame
-        deltaTime = endTime - startTime; // Calculate time taken for frame
+        endTime = SDL_GetTicks();
+        deltaTime = endTime - startTime;
 
         // Delay to control frame rate
-        if (deltaTime < delay) {
-            SDL_Delay(delay - deltaTime);
+        if (deltaTime < renderInterval) {
+            SDL_Delay(renderInterval - deltaTime);
         }
-
-        // Gradually decrease delay to increase speed
-        iteration++;
-        delay = DELAY_TIME * exp(-lambda * iteration) + 10;
             
     } while (quit != 1);
 
@@ -82,15 +111,31 @@ void initializeSDL() {
         fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
         exit(1);
     }
+    int windowWidth = WINDOW_WIDTH;
+    int windowHeight = WINDOW_HEIGHT;
+
+    SDL_DisplayMode DM;
+    if (SDL_GetCurrentDisplayMode(0, &DM) == 0) { // 0 = Primary display
+        windowHeight = DM.h * 0.8;
+        windowWidth = DM.w * 0.8;
+    } else {
+        fprintf(stderr, "SDL_GetCurrentDisplayMode failed: %s\n", SDL_GetError());
+        fprintf(stderr, "Using fallback resolution: %dx%d\n", WINDOW_WIDTH, WINDOW_HEIGHT);
+    }
 
     // Create a window and renderer
-    window = SDL_CreateWindow("Snake Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("Snake Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                              windowWidth, windowHeight, SDL_WINDOW_SHOWN);
     if (window == NULL) {
         fprintf(stderr, "Unable to create window: %s\n", SDL_GetError());
         SDL_Quit();
         exit(1);
     }
+
+    #if FULLSCREEN
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+    #endif
+
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) {
         fprintf(stderr, "Unable to create renderer: %s\n", SDL_GetError());
@@ -109,51 +154,100 @@ void drawGame(WORLD world, SNAKE *snake)
     SDL_SetRenderDrawColor(renderer, 44, 62, 80, 255);
     SDL_RenderClear(renderer);
 
-    elapsedTime = SDL_GetTicks();
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-    // Draw the snake with a green gradient
+    // Draw the snake with a green gradient and glow effect
     for (i = 0; i < snake->dim; i++) {
-        SDL_Rect cellRect = {(snake->pos[i].c + 1) * CELL_SIZE, (snake->pos[i].l + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
-        int r = 110 - (i * 5);
-        int g = 190 - (i * 5);
-        r = clamp(r, 0, 255);
-        g = clamp(g, 0, 255);
-        SDL_Color snakeColor = {r, g, 69, 255}; // Soft green gradient
-        drawRoundedRect(renderer, cellRect, CELL_SIZE / 4, snakeColor);
+        int c = snake->pos[i].c;
+        int l = snake->pos[i].l;
+
+        // Ensure the indices are within bounds
+        if (c >= 0 && c < MAXW && l >= 0 && l < MAXH) {
+            SDL_Rect cellRect = {(c + 1) * CELL_SIZE, (l + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+            int r = 110;
+            int g = 170 - (i * (3 + i % 2));
+            r = clamp(r, 50, 110);
+            g = clamp(g, 110, 170);
+            SDL_Color snakeColor = {r, g, 69, 255}; // Soft green gradient
+
+            // Apply the glowing effects if the snake is glowing
+            for (int k = 0; k < snake->activeGlows; k++) {
+                if (snake->glowing[k] && i == snake->glowCounter[k]) {
+                    snakeColor = get_glow_color(snakeColor, 100.0, snake->glowStartTime[k], 40);
+                }
+            }
+            drawRoundedRect(renderer, cellRect, CELL_SIZE / 4, snakeColor);
+        }
     }
 
-    // Draw objects with softer colors
-    for (i = 0; i < MAXL; ++i) {
-        for (j = 0; j < MAXC; ++j) {
-            SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
-            SDL_Color objColor = {0, 0, 0, 0};
+     // Update the glow counters to propagate the glowing effects
+     Uint32 currentTime = SDL_GetTicks();
+     for (int k = 0; k < snake->activeGlows; k++) {
+        if (snake->glowing[k]) {
+            snake->glowFrameCounter[k]++;
+            if (currentTime - snake->glowFrameCounter[k] >= 3.14159 * 100 * 2) {
+                snake->glowCounter[k]++;
+                snake->glowStartTime[k] = SDL_GetTicks();
+                if (snake->glowCounter[k] >= snake->dim) {
+                    snake->glowing[k] = 0; // Stop the glowing effect when it reaches the tail
+                }
+            }
+        }
+    }
 
-            if (world[i][j] == BONUS_CHAR) {
-                objColor = (SDL_Color){74, 144, 226, 255}; // Soft blue
-            } else if (world[i][j] == MINUS_CHAR) {
-                objColor = (SDL_Color){233, 78, 78, 255}; // Soft red
-            } else if (world[i][j] == LOOP_CHAR) {
-                objColor = (SDL_Color){168, 30, 170, 255}; // Soft brown
+    // Remove inactive glows
+    int activeGlows = 0;
+    for (int k = 0; k < snake->activeGlows; k++) {
+        if (snake->glowing[k]) {
+            snake->glowing[activeGlows] = snake->glowing[k];
+            snake->glowCounter[activeGlows] = snake->glowCounter[k];
+            snake->glowFrameCounter[activeGlows] = snake->glowFrameCounter[k];
+            snake->glowStartTime[activeGlows] = snake->glowStartTime[k];
+            activeGlows++;
+        }
+    }
+    snake->activeGlows = activeGlows;
+
+    // Draw objects with softer colors and glow effect for bonus and loop
+    for (i = 0; i < MAXH; ++i) {
+        for (j = 0; j < MAXW; ++j) {
+            SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+            SDL_Color baseColor = {0, 0, 0, 0};
+            int objSize = 0;
+            float glowSpeed = 1000.0; // Default glow speed
+
+            if (world[i][j].ch == BONUS_CHAR) {
+                baseColor = (SDL_Color){74, 144, 226, 255}; // Soft blue
+                objSize = BONUS_SIZE;
+                glowSpeed = 500.0; // glow
+            } else if (world[i][j].ch == MINUS_CHAR) {
+                baseColor = (SDL_Color){233, 78, 78, 255}; // Soft red
+                objSize = MINUS_SIZE;
+            } else if (world[i][j].ch == LOOP_CHAR) {
+                baseColor = (SDL_Color){168, 30, 170, 255}; // Soft brown
+                objSize = LOOP_SIZE;
+                glowSpeed = 2000.0; // Slower glow
             }
 
-            if (objColor.r != 0) { // Skip empty spaces
-                drawRoundedRect(renderer, cellRect, CELL_SIZE / 6, objColor);
+            if (baseColor.r != 0) { // Skip empty spaces
+                SDL_Color glowColor = get_pulse_color(baseColor, glowSpeed, world[i][j].creation_time, 40);
+                drawObject(renderer, cellRect, glowColor, objSize);
             }
         }
     }
 
     // Draw borders
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 175);
-    for (i = 0; i <= MAXL + 1; ++i)
+    for (i = 0; i <= MAXH + 1; ++i)
     {
-        SDL_Rect cellRect = {(MAXC + 1) * CELL_SIZE, i * CELL_SIZE, CELL_SIZE / 2, CELL_SIZE};
+        SDL_Rect cellRect = {(MAXW + 1) * CELL_SIZE, i * CELL_SIZE, CELL_SIZE / 2, CELL_SIZE};
         SDL_RenderFillRect(renderer, &cellRect);
         SDL_Rect cellRect2 = {CELL_SIZE / 2, i * CELL_SIZE, CELL_SIZE / 2, CELL_SIZE};
         SDL_RenderFillRect(renderer, &cellRect2);
     }
-    for(j = 0; j <= MAXC + 1; ++j)
+    for(j = 0; j <= MAXW + 1; ++j)
     {
-        SDL_Rect cellRect = {j * CELL_SIZE, (MAXL + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE / 2};
+        SDL_Rect cellRect = {j * CELL_SIZE, (MAXH + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE / 2};
         SDL_RenderFillRect(renderer, &cellRect);
         SDL_Rect cellRect2 = {j * CELL_SIZE, CELL_SIZE / 2, CELL_SIZE, CELL_SIZE / 2};
         SDL_RenderFillRect(renderer, &cellRect2);
@@ -161,6 +255,41 @@ void drawGame(WORLD world, SNAKE *snake)
         
     // Update the screen
     SDL_RenderPresent(renderer);
+}
+
+SDL_Color get_pulse_color(SDL_Color baseColor, float glowSpeed, Uint32 creationTime, float delta)
+{
+    Uint32 currentTime = SDL_GetTicks();
+    float time = (currentTime - creationTime) / glowSpeed;
+    float glowFactor = pow(0.5 + 0.5 * sin(time), 6);
+    int r = clamp(baseColor.r + (int)(delta * glowFactor), 0, 255);
+    int g = clamp(baseColor.g + (int)(delta * glowFactor), 0, 255);
+    int b = clamp(baseColor.b + (int)(delta * glowFactor), 0, 255);
+    SDL_Color glowColor = {r, g, b, 255};
+    return glowColor;
+}
+
+SDL_Color get_glow_color(SDL_Color baseColor, float glowSpeed, Uint32 creationTime, float delta)
+{
+    Uint32 currentTime = SDL_GetTicks();
+    float time = (currentTime - creationTime) / glowSpeed;
+    float glowFactor = (1 + sin(time)) / 2;
+    int r = clamp(baseColor.r + (int)(delta * glowFactor), 0, 255);
+    int g = clamp(baseColor.g + (int)(delta * glowFactor), 0, 255);
+    int b = clamp(baseColor.b + (int)(delta * glowFactor), 0, 255);
+    SDL_Color glowColor = {r, g, b, 255};
+    return glowColor;
+}
+
+void drawObject(SDL_Renderer *renderer, SDL_Rect cellRect, SDL_Color Color, int objSize)
+{
+    // Adjust the size of the cellRect based on objSize
+    cellRect.w = objSize;
+    cellRect.h = objSize;
+    cellRect.x += (CELL_SIZE - objSize) / 2;
+    cellRect.y += (CELL_SIZE - objSize) / 2;
+
+    drawRoundedRect(renderer, cellRect, objSize / 4, Color);
 }
 
 void drawRoundedRect(SDL_Renderer *renderer, SDL_Rect rect, int radius, SDL_Color color)

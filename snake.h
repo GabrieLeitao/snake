@@ -9,44 +9,71 @@
 #include <string.h>
 #include <SDL2/SDL.h>
 
-typedef struct position
-{
-    int l, c;  /* line, column */
-} POSITION;
+// World size
+#define MAXH 40
+#define MAXW 60
+
+#define TEST_MODE 1
+
+// Define constants for window dimensions and cell size, for graphic mode with lSDL2
+#define CELL_SIZE 20
+#define DELAY_TIME 300
+#define RENDER_FPS 60
+#define WINDOW_WIDTH 1200
+#define WINDOW_HEIGHT 800
+#define FULLSCREEN 0
 
 // Snake
 #define MAXSNAKE 5
 #define INCSNAKE 5
 #define SNAKESTART_LINE 0
 #define SNAKESTART_COL 0
+#define EMPTY_CHAR ' '
 #define SNAKE_CHAR '*'
 #define BONUS_CHAR '$'
 #define MINUS_CHAR '-'
 #define LOOP_CHAR '&'
 
-// World size
-#define MAXL 50
-#define MAXC 50
+#define SNAKE_SIZE (CELL_SIZE / 1)
+#define BONUS_SIZE (CELL_SIZE / 1.4)
+#define MINUS_SIZE (CELL_SIZE / 1.6)
+#define LOOP_SIZE (CELL_SIZE / 1.1)
 
-// Define constants for window dimensions and cell size, for graphic mode with lSDL2
-#define CELL_SIZE 20
-#define DELAY_TIME 400
-#define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 900
+#define MAX_GLOWS 10 // Maximum number of simultaneous glowing effects
+
+typedef struct position
+{
+    int l, c;  /* line, column */
+} POSITION;
 
 typedef struct snake
 {
     int dim;
     int size_vector;
     POSITION *pos;   /* De suporte ao vector dinâmico */
+    int glowing[MAX_GLOWS];
+    int glowCounter[MAX_GLOWS];
+    int glowFrameCounter[MAX_GLOWS];
+    Uint32 glowStartTime[MAX_GLOWS];
+    int activeGlows;
 } SNAKE;
 
-typedef struct {
+typedef struct
+{
     char character;
     int weight; // Higher values mean higher probability
 } CharProbability;
 
-typedef char WORLD[MAXL][MAXC];
+typedef struct cell
+{
+    char ch;
+    Uint32 creation_time;
+} CELL;
+
+typedef CELL WORLD[MAXH][MAXW];
+
+// Define the probability distribution of characters
+extern CharProbability simb[];
 
 /* Function prototypes */
 POSITION set_position(int l, int c);
@@ -67,5 +94,6 @@ int gameOn(WORLD x);
 int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION direction);
 
 POSITION get_new_loop_position(WORLD x);
+void addNewObject(WORLD x);
 
 #endif /* SNAKE_H_ */
