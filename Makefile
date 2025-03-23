@@ -13,7 +13,7 @@ OBJ_TERMINAL = $(SRC_TERMINAL:.c=.o)
 OBJ_GRAPHIC = $(SRC_GRAPHIC:.c=.o)
 
 # Default target (builds the terminal version)
-default: snake
+default: graphic
 
 # Terminal version
 snake: $(OBJ_TERMINAL)

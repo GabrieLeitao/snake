@@ -17,7 +17,7 @@
 
 // Define constants for window dimensions and cell size, for graphic mode with lSDL2
 #define CELL_SIZE 20
-#define DELAY_TIME 300
+#define DELAY_TIME 250
 #define RENDER_FPS 60
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
@@ -26,18 +26,21 @@
 // Snake
 #define MAXSNAKE 5
 #define INCSNAKE 5
-#define SNAKESTART_LINE 0
-#define SNAKESTART_COL 0
+#define SNAKESTART_LINE MAXH / 2
+#define SNAKESTART_COL MAXW / 2
+#define SNAKESTART_DIR_LINE 0
+#define SNAKESTART_DIR_COL 1
 #define EMPTY_CHAR ' '
 #define SNAKE_CHAR '*'
 #define BONUS_CHAR '$'
 #define MINUS_CHAR '-'
-#define LOOP_CHAR '&'
+#define PORTAL_CHAR '&'
+#define SNAKE_GLOW_SPEED 100.0
 
 #define SNAKE_SIZE (CELL_SIZE / 1)
 #define BONUS_SIZE (CELL_SIZE / 1.4)
 #define MINUS_SIZE (CELL_SIZE / 1.6)
-#define LOOP_SIZE (CELL_SIZE / 1.1)
+#define PORTAL_SIZE (CELL_SIZE / 1.1)
 
 #define MAX_GLOWS 10 // Maximum number of simultaneous glowing effects
 
@@ -93,7 +96,7 @@ int gameOn(WORLD x);
 
 int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION direction);
 
-POSITION get_new_loop_position(WORLD x);
+POSITION get_new_portal_position(WORLD x);
 void addNewObject(WORLD x);
 
 #endif /* SNAKE_H_ */

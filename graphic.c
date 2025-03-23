@@ -28,13 +28,13 @@ int main() {
     POSITION direction;
     int quit = 0;
     float delay = DELAY_TIME;
-    float lambda = 0.005; // Decay rate
+    float lambda = 0.0025; // Decay rate
     int iteration = 0;
 
     initWorld(world);
     initSnake(&snake);
 
-    direction = set_position(0, 1); // line, column
+    direction = set_position(SNAKESTART_DIR_LINE, SNAKESTART_DIR_COL); // line, column
 
     Uint32 startTime, endTime, deltaTime;
     Uint32 lastLogicUpdateTime = SDL_GetTicks();
@@ -42,7 +42,7 @@ int main() {
     const Uint32 renderInterval = 1000 / RENDER_FPS;
     Uint32 objectAddInterval = 2000; // 2 seconds
     Uint32 lastObjectAddTime = SDL_GetTicks();
-    // Main game loop
+    // Main game portal
     do {
         startTime = SDL_GetTicks();
 
@@ -169,14 +169,17 @@ void drawGame(WORLD world, SNAKE *snake)
             r = clamp(r, 50, 110);
             g = clamp(g, 110, 170);
             SDL_Color snakeColor = {r, g, 69, 255}; // Soft green gradient
+            int snakeSize = SNAKE_SIZE;
 
             // Apply the glowing effects if the snake is glowing
             for (int k = 0; k < snake->activeGlows; k++) {
-                if (snake->glowing[k] && i == snake->glowCounter[k]) {
-                    snakeColor = get_glow_color(snakeColor, 100.0, snake->glowStartTime[k], 40);
+                if (snake->glowing[k] && i == snake->glowCounter[k])
+                {
+                    snakeColor = get_glow_color(snakeColor, SNAKE_GLOW_SPEED, snake->glowStartTime[k], 40);
+                    snakeSize = SNAKE_SIZE + 4;
                 }
             }
-            drawRoundedRect(renderer, cellRect, CELL_SIZE / 4, snakeColor);
+            drawObject(renderer, cellRect, snakeColor, snakeSize);
         }
     }
 
@@ -185,7 +188,7 @@ void drawGame(WORLD world, SNAKE *snake)
      for (int k = 0; k < snake->activeGlows; k++) {
         if (snake->glowing[k]) {
             snake->glowFrameCounter[k]++;
-            if (currentTime - snake->glowFrameCounter[k] >= 3.14159 * 100 * 2) {
+            if (currentTime - snake->glowFrameCounter[k] >= 3.14159 * SNAKE_GLOW_SPEED * 2) {
                 snake->glowCounter[k]++;
                 snake->glowStartTime[k] = SDL_GetTicks();
                 if (snake->glowCounter[k] >= snake->dim) {
@@ -208,7 +211,7 @@ void drawGame(WORLD world, SNAKE *snake)
     }
     snake->activeGlows = activeGlows;
 
-    // Draw objects with softer colors and glow effect for bonus and loop
+    // Draw objects with softer colors and glow effect for bonus and portal
     for (i = 0; i < MAXH; ++i) {
         for (j = 0; j < MAXW; ++j) {
             SDL_Rect cellRect = {(j + 1) * CELL_SIZE, (i + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE};
@@ -223,9 +226,9 @@ void drawGame(WORLD world, SNAKE *snake)
             } else if (world[i][j].ch == MINUS_CHAR) {
                 baseColor = (SDL_Color){233, 78, 78, 255}; // Soft red
                 objSize = MINUS_SIZE;
-            } else if (world[i][j].ch == LOOP_CHAR) {
+            } else if (world[i][j].ch == PORTAL_CHAR) {
                 baseColor = (SDL_Color){168, 30, 170, 255}; // Soft brown
-                objSize = LOOP_SIZE;
+                objSize = PORTAL_SIZE;
                 glowSpeed = 2000.0; // Slower glow
             }
 
@@ -325,8 +328,10 @@ void drawRoundedRect(SDL_Renderer *renderer, SDL_Rect rect, int radius, SDL_Colo
 }
 
 // Function to handle user input
-POSITION get_direction(POSITION direction) {
+POSITION get_direction(POSITION direction)
+{
     SDL_Event event;
+    int random = 0;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
@@ -342,6 +347,8 @@ POSITION get_direction(POSITION direction) {
                         return set_position(0, -1);
                     case SDLK_RIGHT:
                         return set_position(0, 1);
+                    case SDLK_SPACE:
+                        random = 1;
                     default:
                         break;
                 }
@@ -349,6 +356,20 @@ POSITION get_direction(POSITION direction) {
             default:
                 break;
         }
+    }
+    if (random)
+    {
+        int c = myRand(3) - 1;
+        while (c == 0 || c == -direction.c)
+        {
+            c = myRand(3) - 1;
+        }
+        int l = myRand(3) - 1;
+        while (l == 0 || l == -direction.l)
+        {
+            l = myRand(3) - 1;
+        }
+        return set_position(l, c);
     }
     return direction;
 }

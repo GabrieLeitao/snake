@@ -6,7 +6,7 @@ CharProbability simb[] = {
     {EMPTY_CHAR, 120},  // 60% empty space
     {BONUS_CHAR, 12},  // 20% bonus
     {MINUS_CHAR, 2},  // 10% minus
-    {LOOP_CHAR, 1},  // 10% loop
+    {PORTAL_CHAR, 1},  // 10% portal
 };
 
 /*-------------------------------------------------*/
@@ -126,28 +126,35 @@ void initWorld(WORLD x)
                 }
             }
         }
+        x[SNAKESTART_LINE][SNAKESTART_COL].ch = EMPTY_CHAR; // Ensure the start position is empty
+        x[SNAKESTART_LINE + SNAKESTART_DIR_LINE][SNAKESTART_COL + SNAKESTART_DIR_COL].ch = EMPTY_CHAR; // Ensure the next position is empty
     }
     #else
     {
         for (i = 0; i < MAXH; ++i) {
-            for (j = 0; j < MAXW; ++j) {
+            for (j = 0; j < MAXW; ++j)
+            {
                 x[i][j].ch = EMPTY_CHAR;
                 x[i][j].creation_time = SDL_GetTicks();
             }
         }
     
         // Add a few objects at the beginning
-        for (i = 0; i < 2; ++i) {
+        for (i = 0; i < 2; ++i)
+        {
             int randRow = myRand(MAXH);
             int randCol = myRand(MAXW);
+            while (randRow != SNAKESTART_LINE && randCol != SNAKESTART_COL && randRow != SNAKESTART_LINE + SNAKESTART_DIR_LINE && randCol != SNAKESTART_COL + SNAKESTART_DIR_COL)
+            {
+                randRow = myRand(MAXH);
+                randCol = myRand(MAXW);
+            }
     
             x[randRow][randCol].ch = BONUS_CHAR;
             x[randRow][randCol].creation_time = SDL_GetTicks();
         }
     }
     #endif
-
-    x[SNAKESTART_LINE][SNAKESTART_COL].ch = EMPTY_CHAR; // Ensure the start position is empty
 }
 
 /*-------------------------------------------------*/
@@ -184,7 +191,7 @@ int gameOn(WORLD x)
 
     for(i = 0; i < MAXH; ++i)
         for (j = 0; j < MAXW; ++j)
-            if (x[i][j].ch == BONUS_CHAR || x[i][j].ch == MINUS_CHAR || x[i][j].ch == LOOP_CHAR)
+            if (x[i][j].ch == BONUS_CHAR || x[i][j].ch == MINUS_CHAR || x[i][j].ch == PORTAL_CHAR)
                 count++;
 
     return count > 0;
@@ -248,18 +255,18 @@ int WorldSnakeInteraction(WORLD world, SNAKE *snake, POSITION direction)
             return 1;
         }
     } 
-    else if (world[newp.l][newp.c].ch == LOOP_CHAR)
+    else if (world[newp.l][newp.c].ch == PORTAL_CHAR)
     {
-        world[newp.l][newp.c].ch = EMPTY_CHAR;  // Clear the loop
-        POSITION loop_pos = get_new_loop_position(world);
-        if (loop_pos.c == -1) {
-            printf("No loop found\n");
+        world[newp.l][newp.c].ch = EMPTY_CHAR;  // Clear the portal
+        POSITION portal_pos = get_new_portal_position(world);
+        if (portal_pos.c == -1) {
+            printf("You disappeared into the Void world! No other portal was found.\n");
             return 1;
         }
         if (snake->dim > 1) {
-            newp = loop_pos;  // Set the new position if using the loop
+            newp = portal_pos;  // Set the new position if using the portal
         } else {
-            printf("You need to have at least 2 points to use the loop\n");
+            printf("You need to have at least 2 points to use the portal\n");
         }
     }
 
@@ -300,9 +307,9 @@ void addNewObject(WORLD x)
     for (k = 0; k < numChars; ++k) {
         cumulativeWeight += simb[k].weight;
         if (randVal < cumulativeWeight) {
-            if (simb[k].character == LOOP_CHAR) {
+            if (simb[k].character == PORTAL_CHAR) {
                 if (randRow < 1 || randRow > MAXH || randCol < 1 || randCol > MAXW) {
-                    continue;  // Skip the loop if it's too close to the border
+                    continue;  // Skip the portal if it's too close to the border
                 }
             }
             x[randRow][randCol].ch = simb[k].character;
@@ -314,14 +321,14 @@ void addNewObject(WORLD x)
 
 /*-------------------------------------------------*/
 
-POSITION get_new_loop_position(WORLD x)
+POSITION get_new_portal_position(WORLD x)
 {
     int i, j;
-    POSITION loop_pos = set_position(-1, -1);
+    POSITION portal_pos = set_position(-1, -1);
     for(i = 0; i < MAXH; ++i)
         for (j = 0; j < MAXW; ++j)
-            if (x[i][j].ch == LOOP_CHAR)
-                loop_pos = set_position(i, j);
-    return loop_pos;
+            if (x[i][j].ch == PORTAL_CHAR)
+                portal_pos = set_position(i, j);
+    return portal_pos;
 }
 /* End of snake_dinamica.c */
