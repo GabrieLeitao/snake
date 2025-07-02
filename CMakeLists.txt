@@ -13,10 +13,10 @@ find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})
 
 # Add the terminal version executable
-add_executable(snake
-    main.c
-    snake.c
-)
+#add_executable(main
+#    main.c
+#    snake.c
+#)
 
 # Add the graphic version executable
 add_executable(graphic
